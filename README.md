@@ -97,6 +97,14 @@ Access token in localStorage (15min TTL). Refresh token in HttpOnly cookie — i
 - No email notifications — in-app only
 - No project deletion UI (API supported)
 
+The hardest problem was implementing the role-filtered real-time activity feed. Every connected WebSocket user needed to receive only events they're authorized to see — not just based on role, but based on their specific data relationship. An Admin sees everything, a PM sees only their own projects, and a Developer sees only tasks assigned to them. I solved this by iterating over all sockets in a project room on each emit and performing a per-socket database authorization check before sending. This ensures filtering is server-side and cannot be bypassed.
+
+For missed events on reconnect, I stored the user's last-seen timestamp in localStorage. On reconnect, the client fetches the last 20 ActivityLog entries from PostgreSQL filtered by that timestamp and the user's role scope — no in-memory caching, accurate even after server restarts.
+
+The refresh token flow was also non-trivial — access tokens live in memory with a 15-minute TTL, refresh tokens are stored in HttpOnly cookies and validated against the database on every refresh request, with automatic cleanup on logout.
+
+One thing I'd do differently: replace the per-emit database check with a Redis pub/sub layer so the server can scale horizontally without each instance having isolated socket state.
+
 ## Keyboard Shortcuts
 - `D` — Go to Dashboard
 - `P` — Go to Projects
